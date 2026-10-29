@@ -1,0 +1,16 @@
+{
+  "name": "arachne-cli",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Terminal client for an arachne agent room: ask, room, hunt, findings, ledger.",
+  "bin": {
+    "arachne": "./bin/arachne.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node bin/arachne.mjs"
+  }
+}
