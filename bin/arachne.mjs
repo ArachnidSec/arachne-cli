@@ -273,6 +273,7 @@ ${bold('COMMANDS')}
   findings                  findings, newest first
   ledger [--clear]          coverage facts and open intents
   state                     hosts, services, targets learned so far
+  campaign [start|stop]     scored run: turns, tokens, cost, time to first finding
   engagement new <name> --targets a,b
   engagement list | use <id>
   tool <name> '<json>'      run one tool by hand
@@ -405,7 +406,7 @@ async function cmdState() {
   if (JSON_OUT) { console.log(JSON.stringify(data.entities || [], null, 2)); return; }
   const groups = {};
   for (const e of data.entities || []) (groups[e.type] = groups[e.type] || []).push(e);
-  const order = ['target', 'host', 'service', 'credential', 'path', 'note'];
+  const order = ['target', 'host', 'service', 'credential', 'access', 'path', 'note'];
   if (!Object.keys(groups).length) {
     console.log(dim('\nstate is empty — nothing probed or mapped yet\n'));
     return;
@@ -418,6 +419,36 @@ async function cmdState() {
       console.log(`   ${e.key} ${dim(attrs)} ${dim(`[${e.confidence}]`)}`);
       for (const l of e.links || []) console.log(dim(`     ${l.rel} → ${l.to}`));
     }
+  }
+  console.log();
+}
+
+async function cmdCampaign() {
+  const sub = words[1];
+  if (sub === 'start') {
+    const name = words.slice(2).join(' ') || 'campaign';
+    const r = await api('/api/campaigns', { method: 'POST', body: { name } });
+    console.log(`${green('campaign')} ${bold(r.campaign.id)} ${r.campaign.name}`);
+    return;
+  }
+  if (sub === 'stop') {
+    const r = await api('/api/campaigns/stop', { method: 'POST' });
+    const c = r.campaign;
+    console.log(`${bold(c.name)} — ${(c.elapsedMs / 1000).toFixed(1)}s · ${c.turns} turns · ${c.tokens.total} tok · ${c.findings.confirmed} confirmed`);
+    if (c.timeToFirstConfirmedMs) console.log(dim(`  first confirmed at ${(c.timeToFirstConfirmedMs / 1000).toFixed(1)}s`));
+    return;
+  }
+  const { active, campaigns } = await api('/api/campaigns');
+  console.log();
+  if (active) {
+    const secs = Math.round(active.elapsedMs / 1000);
+    console.log(`${yellow('●')} ${bold(active.name)} ${dim(active.id)} — running ${Math.floor(secs / 60)}m${String(secs % 60).padStart(2, '0')}s`);
+    console.log(dim(`  ${active.turns} turns · ${active.tokens.total} tok · ${active.findings.confirmed} confirmed · $${active.cost.toFixed(4)}`));
+  } else {
+    console.log(dim('no campaign running'));
+  }
+  for (const c of (campaigns || []).filter((x) => !x.running).slice(0, 6)) {
+    console.log(dim(`  ${c.name} — ${(c.elapsedMs / 1000).toFixed(0)}s · ${c.turns} turns · ${c.findings.confirmed} confirmed`));
   }
   console.log();
 }
@@ -659,6 +690,7 @@ const main = async () => {
     case 'findings': await cmdFindings(); return;
     case 'ledger': await cmdLedger(); return;
     case 'state': await cmdState(); return;
+    case 'campaign': await cmdCampaign(); return;
     case 'engagement': await cmdEngagement(); return;
     case 'tool': await cmdTool(); return;
     case 'ask': await cmdAsk(); return;
