@@ -272,6 +272,7 @@ ${bold('COMMANDS')}
   hunt <target>             run the seven-stage pipeline
   findings                  findings, newest first
   ledger [--clear]          coverage facts and open intents
+  state                     hosts, services, targets learned so far
   engagement new <name> --targets a,b
   engagement list | use <id>
   tool <name> '<json>'      run one tool by hand
@@ -394,6 +395,28 @@ async function cmdLedger() {
       const conf = e.confidence === 'observed' ? green('observed') : yellow('inferred');
       console.log(`${conf} ${e.surface}`);
       console.log(dim(`   ${e.action} → ${String(e.result || '').split('\n')[0].slice(0, 100)}`));
+    }
+  }
+  console.log();
+}
+
+async function cmdState() {
+  const data = await call('GET', '/api/ledger');
+  if (JSON_OUT) { console.log(JSON.stringify(data.entities || [], null, 2)); return; }
+  const groups = {};
+  for (const e of data.entities || []) (groups[e.type] = groups[e.type] || []).push(e);
+  const order = ['target', 'host', 'service', 'credential', 'path', 'note'];
+  if (!Object.keys(groups).length) {
+    console.log(dim('\nstate is empty — nothing probed or mapped yet\n'));
+    return;
+  }
+  console.log();
+  for (const type of order.filter((t) => groups[t]?.length)) {
+    console.log(`${cyan('▪')} ${bold(type)}`);
+    for (const e of groups[type].slice(0, 12)) {
+      const attrs = Object.entries(e.attrs || {}).map(([k, v]) => `${k}=${v}`).join(' ');
+      console.log(`   ${e.key} ${dim(attrs)} ${dim(`[${e.confidence}]`)}`);
+      for (const l of e.links || []) console.log(dim(`     ${l.rel} → ${l.to}`));
     }
   }
   console.log();
@@ -635,6 +658,7 @@ const main = async () => {
     case 'skills': await cmdSkills(); return;
     case 'findings': await cmdFindings(); return;
     case 'ledger': await cmdLedger(); return;
+    case 'state': await cmdState(); return;
     case 'engagement': await cmdEngagement(); return;
     case 'tool': await cmdTool(); return;
     case 'ask': await cmdAsk(); return;
